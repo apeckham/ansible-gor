@@ -1,0 +1,42 @@
+---
+
+- name: install packages
+  apt: pkg={{ item }} state=latest update_cache=yes
+  with_items:
+    - nginx
+    - git
+
+- name: configure nginx
+  copy: src=nginx.conf dest=/etc/nginx/nginx.conf owner=root group=root
+  notify: restart nginx
+
+- name: install go
+  command: "curl -L http://golang.org/dl/go1.3.linux-amd64.tar.gz | tar -C {{ goroot }} -xvzf - creates={{ goroot }}/go"
+
+- name: go version
+  command: "{{ goroot }}/go/bin/go version"
+  register: go_version
+
+- assert:
+    that: "'go version go1.3 linux/amd64' in go_version.stdout"
+
+- name: make GOPATH
+  file: "path={{ gopath }} state=directory mode=0777"
+
+- name: get gor
+  command: "{{ goroot }}/go/bin/go get github.com/buger/gor creates={{ gopath }}/src/github.com/buger/gor"
+  environment:
+    GOPATH: "{{ gopath }}"
+
+- name: build gor
+  command: "{{ goroot }}/go/bin/go build chdir={{ gopath }}/src/github.com/buger/gor creates={{ gopath }}/src/github.com/buger/gor/gor"
+  environment:
+    GOPATH: "{{ gopath }}"
+
+- name: gor version
+  command: "./gor --help chdir={{ gopath }}/src/github.com/buger/gor"
+  ignore_errors: yes
+  register: gor_version
+
+- assert:
+    that: "'Current Version: 0.9.2' in gor_version.stdout"
